@@ -1,9 +1,11 @@
 # Electric Vehicle Charging Stations
 
-Electric Vehicle Charging Stations (evChargers) is a project developed in collaboration between Dr. Henricus Bouwmeester and Jason Carey. EVCS is meant to show an application of machine learning techniques to predict optimal charging station locations for electric vehicles in Colorado. Our predictions are based on multiple factors including:
+Electric Vehicle Charging Stations (EVCS) is a project developed in collaboration between Dr. Henricus Bouwmeester and Jason Carey. EVCS is meant to show an application of machine learning techniques to predict optimal charging station locations for electric vehicles in Colorado. Our predictions are based on multiple factors including:
 - Pre-existing and planned locations for charging stations
 - Density of actively registered electric vehicles in the area
-- Poisson Processes for charging station usage
+- Median income per capita
+- Fuel corridors
+- Additional metrics to be discussed for viability
 
 # Data
 
