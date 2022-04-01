@@ -1,0 +1,234 @@
+---
+title: "EV Analysis"
+author: "Jason Carey"
+date: "2/23/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+## Load libraries
+library(dplyr)
+library(readr)
+library(janitor)
+library(purrr)
+library(plotly)
+library(ggplot2)
+
+```
+
+## Read in the data
+
+```{r}
+ev_registration_path <- "C:/Users/jason/Downloads/Datasets/co_ev_registrations_public.csv"
+ev_chargers_path <- "C:/Users/jason/Downloads/Datasets/alt_fuel_stations.csv"
+
+ev_regs <- 
+  readr::read_csv(ev_registration_path, show_col_types = FALSE) %>%
+  janitor::clean_names()
+
+ev_chgs <- 
+  readr::read_csv(ev_chargers_path, show_col_types = FALSE) %>%
+  janitor::clean_names() 
+
+```
+
+## Create time series intervals to see growth by year
+
+```{r}
+
+ev_regs_year <-
+  ev_regs %>% 
+  dplyr::mutate(
+    year = lubridate::year(lubridate::mdy(registration_valid_date))
+  )
+
+ev_chgs_year <- 
+  ev_chgs %>%
+  dplyr::mutate(
+    full_address = stringr::str_c(street_address, ", ", city, ", ", state, " ", zip),
+    year = lubridate::year(lubridate::mdy(open_date))
+  ) %>%
+  dplyr::select(
+    zip,
+    status_code,
+    latitude,
+    longitude,
+    ev_network,
+    facility_type,
+    open_date,
+    full_address,
+    year
+  ) %>%
+  dplyr::group_by(full_address) %>%
+  dplyr::slice(1)
+
+## Find the unique years present in both data sets
+years <- c(ev_regs_year$year, ev_chgs_year$year) %>% 
+  unique() %>%
+  sort()
+
+ev_regs_list <- years %>%
+  purrr::map(
+    .f = ~{
+      ev_regs_year %>%
+        dplyr::filter(year == .x)
+    }
+  )
+
+ev_chgs_list <- years %>%
+  purrr::map(
+    .f = ~{
+      ev_chgs_year %>%
+        dplyr::filter(year == .x)
+    }
+  )
+
+## Pull the number of rows
+chgs_vec <- ev_chgs_list %>% 
+  purrr::map_dbl(
+    .f = ~{
+      nrow(.x)
+    }
+  )
+
+regs_vec <- ev_regs_list %>%
+  purrr::map_dbl(
+    .f = ~{
+      nrow(.x)
+    }
+  )
+
+## Create a growth table that shows the growth of EV registrations and charging locations per year
+growth <- 
+  data.frame(
+    year = years,
+    chgs = chgs_vec,
+    regs = regs_vec
+  ) %>%
+  dplyr::mutate(
+    chgs_c = cumsum(chgs),
+    regs_c = cumsum(regs),
+    ratio_c = regs_c / chgs_c,
+    chgs_l = log(cumsum(chgs_c)),
+    regs_l = log(cumsum(regs_c)),
+    ratio_l = ifelse(chgs_l > 0, regs_l / chgs_l, regs_l)
+  )
+
+growth_c_plot <- 
+  plotly::plot_ly(
+    data = growth,
+    type = "scatter",
+    mode = "lines"
+  ) %>%
+  plotly::add_trace(
+    x = ~year,
+    y = ~ratio_c,
+    name = "Ratio",
+    line = list(
+      color = "#941C2F",
+      width = 4
+    )
+  ) %>%
+  plotly::layout(
+    title = "Growth Ratio of EV Chargers & Registrations (Linear)",
+    xaxis = list(
+      title = "Year"
+    ),
+    yaxis = list(
+      title = "Volume"
+    )
+  ) %>%
+  plotly::config(
+    displayModeBar = FALSE
+  )
+
+growth_c_plot
+
+growth_l_plot <- 
+  plotly::plot_ly(
+    data = growth,
+    type = "scatter",
+    mode = "lines"
+  ) %>%
+  plotly::add_trace(
+    x = ~year,
+    y = ~chgs_l,
+    name = "Chargers",
+    line = list(
+      color = "#941C2F",
+      width = 4
+    )
+  ) %>%
+  plotly::add_trace(
+    x = ~year,
+    y = ~regs_l,
+    name = "Registrations",
+    line = list(
+      color = "#2C4251",
+      width = 4
+    )
+  ) %>%
+  plotly::add_trace(
+    x = ~year,
+    y = ~ratio_l,
+    name = "Ratio",
+    line = list(
+      color = "#3C3C3C",
+      width = 4
+    )
+  ) %>%
+  plotly::layout(
+    title = "Growth Ratio of EV Chargers & Registrations (Logarithmic)",
+    xaxis = list(
+      title = "Year"
+    ),
+    yaxis = list(
+      title = "Volume"
+    )
+  ) %>%
+  plotly::config(
+    displayModeBar = FALSE
+  )
+
+growth_l_plot
+  
+```
+
+## Plot on a map of Colorado
+
+```{r}
+
+ev_chgs_coords <-
+  ev_chgs_year %>%
+  dplyr::ungroup() %>%
+  dplyr::select(
+    longitude,
+    latitude
+  ) %>%
+  usmap::usmap_transform()
+
+usmap::plot_usmap(include = "CO") +
+  ggplot2::geom_point(
+    data = ev_chgs_coords,
+    ggplot2::aes(
+      x = longitude.1,
+      y = latitude.1
+    ),
+    color = "darkseagreen3",
+    alpha = .6
+  ) +
+  ggplot2::labs(
+    title = "Electric Vehicle Charging Stations In Colorado"
+  )
+
+```
+
+```{r}
+
+## For reproducibility
+set.seed(8571)
+
+```
+

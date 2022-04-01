@@ -1,0 +1,248 @@
+---
+title: "EV Algorithm"
+author: "Jason Carey"
+date: "3/2/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+## Libraries
+library(sf)
+
+```
+
+# Introduction
+
+intro here
+
+## Data Sources
+
+In order to estimate where optimal charging station locations should be within Colorado, we access the following datasets:
+
+  - Colorado EV Registrations
+  - Charging Station Locations within Colorado
+  - Shape files of Colorado's Highways, Major Roadways, and Minor Roadways
+  
+To prep the data for our algorithm we convert the shape files of Colorado's roadways to dataframe of latitude and longitude coordinates. We can assign a priority level to each roadway based on their classification (Highway being 1, Major Roadway being 2, and Minor Roadway being 3). The algorithm should prioritize route creation to our classifications favoring routes that follow highways, then major, then minor roadways.
+
+We'll need a data frame containing the coordinates of charging stations along with calculations of probability that the chargers are in use based on the number of chargers at the station considering the number of EVs registered in the area that may be traveling or commuting. We need to decide the likelyhood of charging at home if simply commuting.
+
+I would need to classify stations within dense areas of Colorado such as Denver, Grand Junction, Colorado Springs, etc. so that when we pick a starting point it selects a point within one of these areas since that is where the population mainly resides. Creating a realistic model would take into consideration people would travel starting from some location within these areas.
+
+We can place coordinates of charging stations within a full coordinate table containing roadway and station locations used later for when we look for an available charger to refuel. 
+
+I identify constants used in our equation as:
+% chance of traveling = .1 (used when calculating the probability a charger is in use at a station)
+distance to travel = range between 250 miles and 500 miles (this represents a trip from Denver to Grand Junction (243 miles) one way, up to the same trip but there and back)
+EV range constant = 200 mi. We assume a standardized range of 200 miles. The median range of EVs found in 2020 by the US Office of Energy Efficiency & Renewable Energy was approx. 250 miles
+https://www.energy.gov/eere/vehicles/articles/fotw-1167-january-4-2021-median-driving-range-all-electric-vehicles-tops-250
+Charge Threshold should be 20%-25% of the total range constant. In our case, if we use 200 miles we would want to look for a charge when we hit 40-50 miles remaining.
+
+These constants would require us to calculate the mileage between points using the haversine formula
+https://www.movable-type.co.uk/scripts/latlong.html
+
+## Data Schemas
+
+how the data tables interact with themselves 
+
+## Process
+
+We want to estimate where charging stations should be located. The algorithm should pick a starting point within a defined metropolitan area (Denver, Grand Junction, Colorado Springs, Ft. Collins, Boulder, etc.). This is a random point within that classification so a random point in Denver for example. 
+
+We would then pick a coordinate point at least 250 miles, but no more than 500 miles away. This would represent traveling to hike, camp, visit a relative, or attend a business meeting given that we had to travel in an EV to this event.
+
+Using our defined priority system for classifying roadways within the state, we would created a route following the roadway constraints in our dataset. To do this we need to make sure that the route is priorizing roadway levels, its heading in the proper direction, and following the shortest route possible. We don't want to take the scenic route here. We would need to find the coordinate points of the end point and check to make sure that points are leading to that location using x, y coordinates (lat, long). Prioritize the greater distance to close first.
+
+As we "drive" along the route we need to track the mileage that we have traveled so that we know if we need to look for chargers to refuel or if we have run out of fuel and should prompt the algorithm to create a new station. When looking for chargers we should expand the allowable range when looking for new points to connect to. That would symbolize a station that is off the road or highway by up to a quarter mile. This additional mileage would have to be accounted for, but could be more assumed (straight line from highway for example). If the charger is found and the probability of it not being in use results in an open station, we can refuel our vehicle to max charge and continue along the route until reaching the endpoint. If there are no chargers and our vehicle runs out of fuel then the algorithm should suggest a new station be added to that area. We will need to mark within our data if a charging station is pre-defined or created by the algorithm.
+
+consider the mileage depending on priority 2 and 3 roads since less gas mileage or fuel efficiency
+
+This simulation should be run at least a few thousand times.
+
+## Load in Data
+
+```{r}
+library(sf)
+
+## Geospatial data paths
+geospatial_root <- fs::dir_ls("C:/Users/jason/Downloads/Datasets/ev_geospatial/decompressed")
+
+## Collect shape files contained within the geospatial root
+shps <- geospatial_root %>%
+  fs::dir_ls(
+    recurse = TRUE,
+    regexp = ".shp$"
+  )
+
+## High priority roads (freeways/highways)
+lev1 <- shps[1] %>%
+  sf::read_sf() %>%
+  dplyr::select(geometry) %>%
+  dplyr::mutate(level = 1) %>%
+  sf::st_zm()
+
+## Moderate priority roads (major roadways) 
+lev2 <- shps[2] %>%
+  sf::read_sf() %>%
+  dplyr::select(geometry) %>%
+  dplyr::mutate(level = 2) %>%
+  sf::st_zm() %>%
+  sf::st_transform(crs = sf::st_crs(lev1))
+
+## Lowest priority roads (minor roadways)
+lev3 <- shps[3] %>%
+  sf::read_sf() %>%
+  dplyr::select(geometry) %>%
+  dplyr::mutate(level = 3) %>%
+  sf::st_zm() %>%
+  sf::st_transform(crs = sf::st_crs(lev1))
+
+## Merge all roadway levels
+all_roads <- lev1 %>%
+  dplyr::bind_rows(lev2, lev3)
+
+# first_shape <- all_roads[1, 1] %>%
+  
+
+## Select a random coordinate point within a starting location
+# starting_bounds <- data.frame(
+#   xmin = -105.242928,
+#   ymin = 39.517881,
+#   xmax = -104.702114,
+#   ymax = 39.936845,
+#   city = "Denver"
+# )
+
+## Write out file after merging
+sf::write_sf(all_roads, "C:/Users/jason/Downloads/Datasets/ev_geospatial/decompressed/all_roads.shp")
+
+## Old work ----
+# roadway_2 <- shps[2] %>%
+#   sf::read_sf() %>%
+#   dplyr::select(
+#     FIPS,
+#     FIPSCOUNTY,
+#     ROUTENAME,
+#     ROUTE,
+#     geometry
+#   ) %>%
+#   janitor::clean_names() %>%
+#   sf::st_zm() %>%
+#   dplyr::mutate(
+#     num = dplyr::row_number()
+#   )
+# 
+# roadway_3 <- shps[3] %>% 
+#   sf::read_sf() %>%
+#   dplyr::select(
+#     FIPS,
+#     FIPSCOUNTY,
+#     ROUTENAME,
+#     ROUTE,
+#     geometry
+#   ) %>%
+#   janitor::clean_names() %>%
+#   sf::st_zm() %>%
+#   dplyr::mutate(
+#     num = dplyr::row_number()
+#   )
+# 
+# convert_table <- roadway_2$num %>%
+#   purrr::map_dfr(
+#     .f = ~{
+#       
+#       ## For testing
+#       # .x <- 1
+#       
+#       print(glue::glue("Converting linestring {.x}"))
+#       
+#       geo_table <- roadway_2$geometry[.x] %>% 
+#         sf::st_as_text() %>% 
+#         stringr::str_remove_all("LINESTRING \\(|\\)") %>% 
+#         stringr::str_split(", ") %>% 
+#         unlist() %>% 
+#         dplyr::tibble() %>%
+#         janitor::clean_names() %>%
+#         tidyr::separate(col = x, into = c("long", "lat"), sep = " ") %>%
+#         dplyr::mutate(num = .x)
+#       
+#     }
+#   )
+# 
+# priority2 <- roadway_2 %>%
+#   dplyr::select(num, fips:route) %>%
+#   dplyr::left_join(
+#     convert_table,
+#     by = "num"
+#   )
+# 
+# data.table::fwrite(priority2, "priority2.csv")
+# 
+# ## Way to slow...
+# future::plan(future::multisession, workers = 3)
+# 
+# convert_table <- roadway_3$num %>%
+#   furrr::future_map_dfr(
+#     .f = ~{
+#       
+#       ## For testing
+#       # .x <- 1
+#       
+#       print(glue::glue("Converting linestring {.x}"))
+#       
+#       geo_table <- roadway_3$geometry[.x] %>% 
+#         sf::st_as_text() %>% 
+#         stringr::str_remove_all("LINESTRING \\(|\\)") %>% 
+#         stringr::str_split(", ") %>% 
+#         unlist() %>% 
+#         dplyr::tibble() %>%
+#         janitor::clean_names() %>%
+#         tidyr::separate(col = x, into = c("long", "lat"), sep = " ") %>%
+#         dplyr::mutate(num = .x)
+#       
+#     }
+#   )
+# 
+# priority3 <- roadway_3 %>%
+#   dplyr::select(num, fips:route) %>%
+#   dplyr::left_join(
+#     convert_table,
+#     by = "num"
+#   )
+# 
+# data.table::fwrite(priority3, "priority3.csv")
+
+# test <- roadway_2$geometry[1] %>% 
+#   sf::st_as_text() %>% 
+#   stringr::str_remove_all("LINESTRING \\(|\\)") %>% 
+#   stringr::str_split(", ") %>% 
+#   unlist() %>% 
+#   dplyr::tibble() %>%
+#   janitor::clean_names() %>%
+#   tidyr::separate(col = x, into = c("long", "lat"), sep = " ")
+
+# ggplot2::ggplot() +
+#   ggplot2::geom_sf(data = roadway_2) +
+#   ggplot2::geom_sf(data = roadway_3)
+
+  # dplyr::mutate(
+  #   
+  # )
+
+```
+
+pick a random point in a zip code and filter linestrings that contain that coordinate point as a starting point
+
+To calculate the availability of chargers within a charging station we can approximate the probability following a poisson process. Since the arrival times at these charging stations are random we can use a poisson distribution to simulate the number of cars using the chargers at the time our 'vehicle' is in range, and seeking a charger.
+
+Notes: We can keep this simple by only fitting the poisson distribution when the vehicle is nearby and seeking a charger. The charging station will be cleared of cars when the vehicle is no longer in range. Cars will 'stay' at the charger indefinitely until our 'vehicle' passes and leaves the range.
+
+For routes:
+Time (based on speed) vs. distance travelled
+
+```{r}
+# rpois()
+```
+
