@@ -72,7 +72,7 @@ simulate_trip <- function(
         dplyr::pull(num_chargers)
 
       ## Check for charger availability
-      in_use <- rpois(1, a)
+      in_use <- stats::rpois(1, a)
 
       if (in_use >= n_chg) {
         charger_available <- FALSE

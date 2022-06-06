@@ -4,12 +4,12 @@
 \name{evChargers-package}
 \alias{evChargers}
 \alias{evChargers-package}
-\title{evChargers: What the Package Does (One Line, Title Case)}
+\title{evChargers: Simulate Route Creation and Travel for Electric Vehicles in Colorado}
 \description{
-What the package does (one paragraph).
+Within the state of Colorado (US) we want to predict where future electric vehicle charging stations should be built. This package contains functions to create routes between points, simulate travel between those points, and check whether an electric vehicle would successfully complete the trip. Using the outcomes we can fit a classification model to predict the optimal charging station locations for future chargers.
 }
 \author{
-\strong{Maintainer}: First Last \email{first.last@example.com} (\href{https://orcid.org/YOUR-ORCID-ID}{ORCID})
+\strong{Maintainer}: Jason Carey \email{jcarey9@msudenver.edu}
 
 }
 \keyword{internal}

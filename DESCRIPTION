@@ -1,23 +1,23 @@
 Package: evChargers
-Title: What the Package Does (One Line, Title Case)
-Version: 0.0.0.9000
+Title: Simulate Route Creation and Travel for Electric Vehicles in Colorado
+Version: 0.1.0
 Authors@R: 
-    person(given = "First",
-           family = "Last",
-           role = c("aut", "cre"),
-           email = "first.last@example.com",
-           comment = c(ORCID = "YOUR-ORCID-ID"))
-Description: What the package does (one paragraph).
+  c(
+    person(given = "Jason", family = "Carey", role = c("cre", "aut"), email = "jcarey9@msudenver.edu")
+  )
+Description: Within the state of Colorado (US) we want to predict where future electric vehicle charging stations should be built. This package contains functions to create routes between points, simulate travel between those points, and check whether an electric vehicle would successfully complete the trip. Using the outcomes we can fit a classification model to predict the optimal charging station locations for future chargers.
 License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.1.1
+RoxygenNote: 7.2.0
 Imports: 
     dplyr,
     glue,
     osrm,
     purrr,
     sf,
+    stringr,
+    tidyr,
     usethis,
     magrittr (>= 2.0.1)
