@@ -5,7 +5,7 @@ simulate_trip <- function(
   evc_data,
   route_dist,
   fuel_dist,
-  a = 2
+  alpha = 2
 ) {
 
   usethis::ui_info("Simulating trip...")
@@ -72,7 +72,7 @@ simulate_trip <- function(
         dplyr::pull(num_chargers)
 
       ## Check for charger availability
-      in_use <- stats::rpois(1, a)
+      in_use <- stats::rpois(1, alpha)
 
       if (in_use >= n_chg) {
         charger_available <- FALSE
@@ -224,5 +224,7 @@ simulate_trip <- function(
     route_index <- route_index + 1
 
   }
+
+  return(invisible())
 
 }
